@@ -16,7 +16,7 @@ There are four data representations:
 * Design Pattern 1: [Hashed Feature](#design-pattern-1-hashed-feature)
 * Design Pattern 2: Embeddings
 
-
+---
 
 ## Simple Data Representations
 
@@ -72,7 +72,7 @@ There are certain problems with **categorical features**. Namely,
 
 It's easy to see that all three above-mentioned issues are addressed.
 
----
+
 
 **Tradeoffs and alternatives**
 
