@@ -88,3 +88,78 @@ It's easy to see that all three above-mentioned issues are addressed.
 
 ## Design Pattern 2: Embeddings
 
+_Embeddings_ are a learnable data representation that map data into a lower-dimensional space in such a way that the information relevant to the learning problem is preserved. They provide a way to handle disparate data types in a way that preserves similarity between items and thus improves our model's ability to learn those essential patterns.
+
+Remember **one-hot-encoding**? What if we had many categories to consider? Also, it treats the categorical variables as being _independent_. That might not be the case.
+
+Embeddings address both problems.
+
+### Text embeddings
+
+Text provides a natural setting where it is advantageous to use an _embedding_ layer. To do that in Keras, see the following example:
+
+```python
+# First, we create a tokenization for each word in our vocabulary.
+tokenizer = keras.preprocessing.text.Tokenizer()
+tokenizer.fit_on_texts(titles_df.title)
+
+# Second, we use |texts_to_sequences| method to convert words into their indices.
+integerized_titles = tokenizer.texts_to_sequences(titles_df.titles)
+
+# Third, we pad sentences so all of them have the same length.
+VOCAB_SIZE = len(tokenizer.index_word)
+MAX_LEN = max(len(sequence) for sequence in integerized_titles)
+def create_sequences(texts, max_len=MAX_LEN):
+  sequences = tokernizers.texts_to_sequences(texts)
+  padded_seqs = keras.preprocessing.sequence.pad_sequences(sequences,
+                                                           max_len,
+                                                           padding='post')
+  return padded_seqs
+
+# Finally, we can pass our |padded_sequences| to the model.
+model = keras.models.Sequential([
+  keras.layers.Embedding(input_dim=VOCAB_SIZE + 1,
+                         output_dim=embed_dim,  # arbitrary embedding length
+                         input_shape=[MAX_LEN]),
+  keras.layers.Dense(N_CLASSES, activation='softmax')  # example: sentiment analysis
+])
+```
+
+### Image embeddings
+
+Data types, such as images or audio, consist of dense and high-dimensional vectors. Therefore, lowering dimensionality by learning _embeddings_ are essential.
+
+For image embeddings, there are several pretrained CNN architectures - like Inception or ResNet - available. We usually use these pretrained CNNs by removing the last _softmax_ layer to obtain a lower-dimension embedding for our images. Then we can plug that embedding layer into our network for our purpose. Suppose we have an _image captioning_ task at hand:
+
+<img src="img/embeddings01.jpg" alt="embeddings01" style="zoom:50%;" />
+
+**Tradeoffs and alternatives**
+
+* <span style="color:darkgreen">_Choosing the embedding dimension_</span>: by lowering the dimensionality, we lose some information. The optimal embedding dimension is a hyperparameter that we need to tune.
+* <span style="color:darkgreen">_Autoencoders_</span>: Training embeddings in a supervised way may require a lot of labeled data. If that is not possible, we can set up an _autoencoder_ network to obtain the embeddings.
+
+<img src="img/embeddings02.jpg" alt="embeddings02" style="zoom:50%;" />
+
+* <span style="color:darkgreen">_Context language models_</span>: a pretrained text embedding, like Word2Vec or BERT, can be added to a ML model to process text features in conjunction with learned embeddings from image/video/... input.
+  * _Word2Vec_: Bag of Words + skip-gram
+  * BERT: masked language model + next sentence prediction. Therefore, it can understand the difference between `Apple` as the fruit or as the company.
+* <span style="color:darkgreen">_Embeddings in a data warehouse_</span>: we can load a pretrained model into our data warehouse and use it to transform text column into an embedding array. (More on this in Chapter 6)
+
+---
+
+## Design Pattern 3: Feature Cross
+
+A _feature cross_ is formed by concatenating two or more categorical features in order to capture the _interaction_ between them. It would also make it possible to encode _nonlinearity_ into the model.
+
+Complex models like neural networks and trees do this automatically, but performing _feature cross_ can help **simpler linear models to improve**. It will also allow **data warehouse queries** to provide quick analytical reports.
+
+**Tradeoffs**
+
+* <span style="color:darkred">_Handling numerical features_</span>: the space is infinte for continous variables. We should bucketize the data to make them categorical.
+* <span style="color:darkred">_Handling high cardinality_</span>
+* <span style="color:darkred">_Need for regularization_</span>
+
+---
+
+## Design Patter 4: Mutltimodal Input
+
