@@ -14,7 +14,9 @@ There are four data representations:
 
 * [Simple Data Representation](#simple-data-representations): eg _scaling_, _normalizing_, etc
 * Design Pattern 1: [Hashed Feature](#design-pattern-1-hashed-feature)
-* Design Pattern 2: Embeddings
+* Design Pattern 2: [Embeddings](#design-pattern-2-embeddings)
+* Design Pattern 3: [Feature Cross](#design-pattern-3-feature-cross)
+* Design Pattern 4: [Mutltimodal Input](#design-pattern-4-mutltimodal-Input)
 
 ---
 
@@ -161,5 +163,64 @@ Complex models like neural networks and trees do this automatically, but perform
 
 ---
 
-## Design Patter 4: Mutltimodal Input
+## Design Pattern 4: Mutltimodal Input
 
+Sometimes, it is desired to have different data types fed into the model for more accurate predictions. For example, if we have image data with their metadata, we may be able to have a more accurate prediction for traffic control.
+
+In addition to _mixing different datatypes_, we may also want to represent the _same data in different ways_ to make it easier for our model to identify pattenrs.
+
+* Combining different types of data, like images + metadata
+* Representing complex data in multiple ways
+
+
+
+**Tabular data**
+
+We have five-star review ratings of restaurants. We may want to use the rating as-is, and also categorize them as `dislike` for {1, 2, 3}, and `like` for {4, 5}. That is because the value of rating as measured by 1 to 5 stars does not necessarily increase linearly.
+
+
+
+**Text**
+
+Text can be represented as _embeddings_ as we have seen before. Or, we can represent them as bag of words (BoW). BoW does not preserve the order of our text, but it does detect the prsence or absence of certain words.
+
+* **BoW** does not require training and its encoding can be used in simpler models, like XGBoost or linear regression.
+* We can extract **tabular features** from text too. Like `{title_len, word_count, ends_with_q_mark,...}`. 
+
+Using these representations, next to embeddings, may also improve deep learning models.
+
+
+
+**Images**
+
+Images can be represented as **arrays of pixel values** (output of `Flatten()` as we see in deep neural networks built for MNIST) or as **tiled structure** (output of CNNs). The following code gives an example using Keras Functional API:
+
+```python
+image_input = Input(shape=(28, 28, 3))
+
+# Pixel values
+pixel_layer = Flatten()(image_input)
+
+# Tiled representation
+tiled_layer = Conv2D(filters=16, kernel_size=3, activation='relu')(image_input)
+tiled_layer = MaxPooling2D()(tiled_layer)
+tiled_layer = keras.layers.Flatten()(tiled_layer)
+
+# Concatenate into a single layer
+merged_image_layers = keras.layers.concatenate([pixel_layer, tiled_layer])
+
+# Output layer
+merged_dense = Dense(16, activation='relu')(merged_image_layers)
+merged_output = Dense(N_CLASSES)(merged_dense)
+
+# Build the model
+model = Model(inputs=image_input, outputs=merged_output)
+```
+
+
+
+**Images + Metadata**
+
+![image_metadata](img/image_metadata.jpg)
+
+* <span style="color:darkred">Caveat</span>: DL models are inherently diffciult to explain. However, there are several techniques for explaining image models that can highligh the pixels that affected model's predictions. By **combining image data with metadata**, these features become dependent on one another, and therefore, it can be difficult to explain how the model is making predictions.
