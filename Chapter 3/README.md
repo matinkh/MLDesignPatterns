@@ -4,8 +4,8 @@ This chapter looks at different types of ML problems and analyzes how the model 
 
 * _[Reframing](#Design-Pattern-5-Reframing)_ design pattern takes a solution that is intuitively a regression problem and poses it as a classification problem (and vice versa).
 * _[Multilabel](#Design-Pattern-6-Multilabel)_ design pattern handles the case that training examples can belong to more than one class.
+* _[Ensemble](#Design-Pattern-7-Ensembles)_ design pattern solves a problem by training multiple models and aggregating their responses.
 * _Cascade_ design pattern addresses situations where a ML problem can be broken into a series (or cascade) of ML problems.
-* _Ensemble_ design pattern solves a problem by training multiple models and aggregating their responses.
 * _Neutral Class_ design pattern recommends approaches to handle highly skewed or imblalanced data.
 
 ---
@@ -47,4 +47,37 @@ By looking at the output probability distribution we can **capture uncertainties
 ---
 
 ## Design Pattern 6: Multilabel
+
+_Multilabel_ classification means we can assign more than one label to a given training example. Not that this is different from _multiclass_ classification problems, where a signle example is assigned exactly one label from a group of many (>1) possible classes; if we could pick more than one label, then that would be _multilabel, multiclass classification_.
+
+An example for _multilabel_ classification is "determining tags for Stack Overflow questions." Each question can be tagged with multiple labels; e.g., "Python", "pandas", and "visualization."
+
+---
+
+**Use sigmoid!**
+
+The solution for building models that can assign more than one label to a given training example is to use the _sigmoid_ activation function in our final output layer. (Rather than generating an array where all values sum to 1 - _softmax_)
+
+The number of units in the final layer is the same as the number of classes. Each output will be assigned a sigmoid value.
+
+```python
+model = keras.Sequential([
+  keras.layers.Flatten(input_shape=(28, 28)),
+  keras.layers.Dense(128, activation='relu'),
+  keras.layers.Dense(3, activation='sigmoid')  # We can assign three labels to each example.
+])
+```
+
+---
+
+**Tradeoffs and alternatives**
+
+* **Which loss function?** the book suggests using `binary_crossentropy` for binary and multilabel models. This is because a multilabel problem is essentially several binary classification problems.
+* **How to parse sigmoid results?** for _softmax_ case, we could simply use `argmax` to find the class label. For multilabel with sigmoid values, the book suggests using a _probability threshold_. Any value greater than threshold should be considered as the predicted label.
+* **Dataset considerations:** Building a balanced dataset is more nuanced for the _Multilabel design pattern_. There is usually a hierarchy to the predicted labels. We can (i) use a flat approach and have one layer with all labels; or (ii) use the _Cascade_ design patterhn; i.e., one model identifies higher-level labels, and more specific ones are assigned by other models.
+* **One-versus-rest:** For _Multilabel_ classification we can train multiple binary classifiers instead on one multilabeled model. It's called _one versus rest_. Each binary classifier identifies whether or not to assign its label. The benefit is that we can use model architectures that are mostly suitable for binary classifications, such as SVM.
+
+---
+
+## Design Pattern 7: Ensembles
 
