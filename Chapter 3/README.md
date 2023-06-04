@@ -5,7 +5,7 @@ This chapter looks at different types of ML problems and analyzes how the model 
 * _[Reframing](#Design-Pattern-5-Reframing)_ design pattern takes a solution that is intuitively a regression problem and poses it as a classification problem (and vice versa).
 * _[Multilabel](#Design-Pattern-6-Multilabel)_ design pattern handles the case that training examples can belong to more than one class.
 * _[Ensemble](#Design-Pattern-7-Ensembles)_ design pattern solves a problem by training multiple models and aggregating their responses.
-* _Cascade_ design pattern addresses situations where a ML problem can be broken into a series (or cascade) of ML problems.
+* _[Cascade](#Design-Pattern-8-Cascade)_ design pattern addresses situations where a ML problem can be broken into a series (or cascade) of ML problems.
 * _Neutral Class_ design pattern recommends approaches to handle highly skewed or imblalanced data.
 
 ---
@@ -81,3 +81,60 @@ model = keras.Sequential([
 
 ## Design Pattern 7: Ensembles
 
+Errors in any ML model can be broken down into three parts: (i) high bias, (ii) high variance (both are _reducible errors_) and (iii) _irreducible errors_ (due to noise in data, framing of the problem, bad training examples, etc)
+
+High bias is also referred to as _under-fitting_ problem. High variance is _overfitting_.
+
+In practice, it's hard to lower bias and variance at the same time. Of course, this is the case for small and mid-size datasets.
+
+**Solution:** by building several models with different inductive biases and aggregating their outputs, we hope to get a model with better performance.
+
+* Bagging
+* Boosting
+* Stacking
+
+---
+
+**Bagging** (Bootstrap AGGregatING) - Addresses **high variance**.
+
+The aggregation takes place on the output of the multiple ensemble models - average, majority vote, etc. Random Forest is one example of Bagging.
+
+With bagging, the model and algorithms are the same. For example, with random forest, the submodels are all short decision trees.
+
+<span style="color:darkgreen">Strengths:</span>
+
+* On average, the ensemble model will perform at least as well as any of the individual models in the ensemble.
+* It's even a recommended solution to fix high variance of neural networks.
+
+<span style="color:darkred">Cons:</span>
+
+* Bagging is typically less effective for more stable learners, such as kNN, Naive Bayes, linear models, or SVMs. That is because the size of the training set is reduced through bootstrapping.
+
+---
+
+**Boosting** - Address **high bias**.
+
+Unlike bagging, boosting ultimately constructs an ensemble model with _more_ capacity than the individual member models.
+
+The idea behind boosting is to iteratively build an ensemble of models where each successive model focuses on learning the examples the previous model got wrong. In short, boosting iteratively improves upon a sequence of weak learners taking a weighted average to ultimately yield a strong learner.
+
+Examples: AdaBoost, Gradient Boosting Machines, XGBoost.
+
+---
+
+**Stacking**
+
+Unlike bagging, the intial models are typically of different model types and are trained to completeion on the full dataset. Then, a secondray meta-model is trained using the initial model outputs as features. This second meta-model learns how to best combine the outcomes of the initial models to decrease the training error and can be any type of ML model.
+
+---
+
+**Tradeoffs and alternatives**
+
+* **Increased training and design time:** _Is it best to reuse the same architecture or encourage diversity?_ _If we use different architectures, which ones should we use?_ ... (Always compare accuracy and resource usage against a linear or DNN model)
+* **Dropout as bagging:** Dropout in neural network randomly turns off neurons of the network for each mini-batch, essentially evaluating a bagged ensemble of exponentially many neural networks. (It's not exactly bagging. First, models are not independent. Second, each member model would only be trained for a single training loop, not the respective training set)
+* **Decreased model interpretability**
+* **Choosing the right tool for the problem:** boosting for high bias. Bagging for high variance.
+
+---
+
+## Design Pattern 8: Cascade
