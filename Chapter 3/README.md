@@ -6,7 +6,7 @@ This chapter looks at different types of ML problems and analyzes how the model 
 * _[Multilabel](#Design-Pattern-6-Multilabel)_ design pattern handles the case that training examples can belong to more than one class.
 * _[Ensemble](#Design-Pattern-7-Ensembles)_ design pattern solves a problem by training multiple models and aggregating their responses.
 * _[Cascade](#Design-Pattern-8-Cascade)_ design pattern addresses situations where a ML problem can be broken into a series (or cascade) of ML problems.
-* _Neutral Class_ design pattern recommends approaches to handle highly skewed or imblalanced data.
+* _[Neutral Class](#Design-Pattern-9-Neutral-Class)_ design pattern recommends approaches to handle highly skewed or imblalanced data.
 
 ---
 
@@ -138,3 +138,59 @@ Unlike bagging, the intial models are typically of different model types and are
 ---
 
 ## Design Pattern 8: Cascade
+
+The _Cascade_ design pattern addresses situations where a ML problem can be profitably broken into a series of ML problems.
+
+Any ML problem where the output of the one model is an input to the following model or determines the selection of subsequent models is called a _Cascade_.
+
+Say we need to predict a value during both usual and usual activity. The model will learn to ignore the unusual activity because it is rare. If the unusual activity is also associated with abnormal values, then trainability suffers.
+
+---
+
+For example, we would like to predict the likelihood that a customer will return an item that they have purchased. If we train a single model, the resellers' return behavior will be lost because there are millions of retail buyers, and only a few thousand resellers.
+
+* Retail buyers usually return their item within a few weeks.
+* Resellers return the item only if they cannot re-sell it. So, that would be several months.
+
+One way to solve this problem is to overweight the reseller instances when training our model. This solution is suboptimal.
+
+We do not want to trade off a lower accuracy on the retail buyers for a higher accuracy on the reseller use cases. It is necessary to get both types of returns as accurate as possible.
+
+---
+
+**How to Cascade?**
+
+* Predict whether a data point is _usual_ or _unusual_.
+* Train one model on the _usual_ cases.
+* Train the second model on the _unusual_ cases.
+* In production, combine the output of the three seperate models to predict the final outcome.
+
+---
+
+**Use the output of the first model; not actual labels**
+
+At prediction time, we don't have true labels, just the output of the first classifier. And predictions have errors. So, the second and third models are required to make predictions on data that they might have never seen during training.
+
+Wherever the output of a ML model needs to be fed as the input to another model, the second model needs to be trained on the predictions of the first model; not the actual labels.
+
+---
+
+**Tradeoffs and alternatives**
+
+_Cascade_ is <u>NOT</u> necessarily a best practice. It adds complexity to your ML workflows, and may actually lower the performance. As much as possible, try to limit a pipeline to a single ML probel. Avoid having, as in the _Cascade_ pattern, multiple ML models in the same pipeline.
+
+Splitting an ML problem is usually a bad idea. An ML model should learn combinations of multiple factors.
+
+So, **when to use Cascade?**
+
+* Cascade design pattern addresses an **unusual scenario** for which we do not have a categorical input, and for which extreme values need to be learned from multiple inputs.
+  * Predicting rain falls using satellite images. For >99% of pixels, it won't rain. So, it's best to predict where it rains, and where it doesn't. And then, estimate the rain fall for positive cases.
+* **Pre-trained models.** When we wish to reuse the output of a pre-trained model as an input into our model.
+  * We are building a model to detect authorized entrants to a building. We wish to use an existing OCR to read license plates.
+  * OCR systems will have errors. Therefore, we should train the model on the actual output of the OCR system.
+  * It is also necessary to retrain the model if we change the OCR system.
+
+---
+
+## Design Pattern 9: Neutral Class
+
