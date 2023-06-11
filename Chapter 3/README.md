@@ -7,6 +7,7 @@ This chapter looks at different types of ML problems and analyzes how the model 
 * _[Ensemble](#Design-Pattern-7-Ensembles)_ design pattern solves a problem by training multiple models and aggregating their responses.
 * _[Cascade](#Design-Pattern-8-Cascade)_ design pattern addresses situations where a ML problem can be broken into a series (or cascade) of ML problems.
 * _[Neutral Class](#Design-Pattern-9-Neutral-Class)_ design pattern recommends approaches to handle highly skewed or imblalanced data.
+* [Rebalancing](#Design-Pattern-10-Rebalancing) design pattern provide various ways to handle imbalance datasets.
 
 ---
 
@@ -194,3 +195,35 @@ So, **when to use Cascade?**
 
 ## Design Pattern 9: Neutral Class
 
+In many classification situations, creating a neutral class can be helpful. For example, we train a three-class classifier that outputs disjoint probabilities for Yes, No, and Maybe.
+
+---
+
+**Example: acetaminophen or ibrufen**
+
+In our data, we see that 10% of of the patients are atrisk of liver damage. Thus, they were prescribed _ibrufen_ for painkiller. Another 10% had history of stomach ulcers. Therefore, they were prescribed _acetaminophen_. The rest were given either ibrufen or acetaminophen.
+
+Our model should predict _either_ for those cases that are not in those categories.
+
+---
+
+**Example: apgar score**
+
+At birth, newborns are assigned a _apgar score_ to indicate how healthy they are or if they require immediate medical attention. Scores of 9 and 10 are considered healthy.
+
+An apgar score involves a number of subjective assessments, and whether a baby is assigned 8 or 9 often reduces to matters of physician preference. What if we create a neutral class to hold these "marginal" scores?
+
+---
+
+**Tradeoffs and alternatives**
+
+Neutral class design pattern is useful for
+
+* **When human experts disagree**. If it's not a clear signal from all our experts to label a data point, we can have a "_maybe_" class.
+  * Another approach is to use the disagreement among human labelers as the weight of a data point. E.g., if experts are split 3 to 2, we give 0.6 weight to the data point, and allow our classifier to focus more on the "_sure_" cases.
+* **Customer satisfaction**. If we attempt to train a binary classifier by thresholding at 6, the model will spend too much effort trying to get essentially neutral responses correct. It's better to categorize 1 to 4 as bad, 8 to 10 as good, and 5 to 7 as neutral.
+* **Reframing with neutral class**. Imagine we want to have a model to predict if a stock goes up or down so we can decide wether to buy or sell. The end goal is to decide whether to purchase or sell. So, it's best to identify stocks that rise >5%, or drop >5% in the next six months for the decision, and consider the rest as neutral. (Instead of having a regression model to predict if a stock rises or drops)
+
+---
+
+## Design Pattern 10: Rebalancing
