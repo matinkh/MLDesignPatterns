@@ -227,3 +227,71 @@ Neutral class design pattern is useful for
 ---
 
 ## Design Pattern 10: Rebalancing
+
+Many real-world problems are not so neatly balanced. For example, for _fraud detection_, we are building a model to identify fradulent credit card transactions. Such transactions are much rarer than regular transactions.
+
+In regression cases, imbalanced datasets refer to data with outlier values that are either much higher or lower than the median in your dataset.
+
+In cases of imbalanced dataset, accuracy values for model evaluation are misleading. Because always predicing the major case results in a high accuracy. It's important to **choose an appropriate evaluation metric**. Then, there are various techniques we can employ for handling inherently imbalanced datasets at both the dataset and model level; e.g., _downsampling_, _class weights_, etc
+
+---
+
+**Choose an evaluation metric**
+
+For imbalanced datasets, it's best to use metrics like **precision**, **recall**, or **F-measure** to get a complete picture of how our model is performing.
+
+* **Precision:** %TP out of all _predicted_ positives. ($\frac{TP}{TP + FP}$)
+* **Recall:** %TP out of all _actual_ positives. ($\frac{TP}{TP+FN}$)
+* **F-measure:** it's a metric that takes both precision and recall into account. ($2 \times \frac{precision \times recall}{precision + recall}$)
+
+---
+
+**Note:** When evaluating models trained on imbalanced datasets, we need to use _unsampled data_ when calculating success metrics. This means that no matter how we modify our dataset for training, <span style="color:blue">we should leave our test set as is</span> so that it provides an accurate representation of the original dataset.
+
+---
+
+**Changing dataset or model**
+
+* **Dataset level**
+
+  * _Downsampling_
+    * we decrease the number of examples from the majority class used during model training.
+    * it's usually combined with _Ensemble_ pattern.
+      * `downsample the majority class` $\rightarrow$ `Train a model` $\rightarrow$ `add it to ensemble` $\rightarrow$ ..repeat..
+      * During inference, we take the _median_ output of the ensemble models.
+  * _Upsampling_
+    * Overrepresent the minority class by both replicating some examples, and generating additional, synthetic examples.
+    * One known model is SMOTE, which randomly generates a new minority class example between data points.
+    * Similar logic can be applied to image datasets. `Keras.ImageDataGenerator` class does data augmentation - variations of the same image by _rotating_, _cropping_, _adjusting brightness_, and more.
+
+* **Model level:**
+
+  * _Weighting_
+
+    * we can change the _weight_ our model gives to examples from each class. (different from "weights" learned by model during training). By weighting _classes_, we tell our model to treat specific classes with more importance during training.
+    * the class weight values should be related to the balance of each class in our dataset.
+
+    ```python
+    minority_class_weight = 1 / (num_minority_examples/total_examples)/2
+    majority_class_weight = 1 / (num_majority_examples/total_examples)/2
+    ```
+
+    * In `Keras` we can pass `class_weights` dict to our model when we train it with `fit()`.
+
+    ```python
+    class_weights = {0: majority_class_weight, 1: minority_class_weight}
+    model.fit(train_data, train_labe, class_weights)
+    ```
+
+---
+
+**Tradeoffs and alternatives**
+
+* **Number of minority class examples available:** If the number of examples are too low, downsampling may make the resulting dataset too small for a model to learn from.
+* **Upsampling for text:** generating synthetic data is less straightforward for text data. It's best to rely on downsampling and weighted classes.
+* **Combining different techniques:** Downsampling and class weight techniques can be combined for optimal result. We start by downsampling our data until we find a balance that works for our use case. Then, based on the label ratios for the rebalanced dataset, use class weight technique.
+  * Downsampling is also often combined with the _Ensemble_ design pattern.
+    * Say we have 100 of the minority class and 1000 of the majority class.
+    * We split the majority class in 10 sets and create 10 {100+100} balanced datasets.
+    * We then train 10 classifiers and use bagging technique to aggregate their outputs.
+* **Importance of explainability:** _attribution value_ tells us how much each feature in our model influenced the model's prediction. When dealing with imbalanced data, it's important to look beyond our model's accuracy and error metrics to verify that it's picking up on meaningful signals in our data.
