@@ -12,7 +12,7 @@ _Machine learning_ is a process of building models that learn from data. This is
 
 ## Data and Feature Engineering
 
-Data is the hart of any machine learning problem.
+Data is the heart of any machine learning problem.
 
 * _Training data_, which is fed to the model during training process.
 * _Validation data_, which is held out from training set and used to evaluate how the model is performing _after each training epoch_.
