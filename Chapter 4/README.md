@@ -5,7 +5,7 @@ ML models are usually trained iteratively, and this iterative process is informa
 * **[Useful Overfitting](#Design-Pattern-11-Useful-Overfitting):** we forgo the use of a validation or testing dataset, because we want to intentionally overfit on the training dataset.
 * **[Checkpoints](#Design-Pattern-12-Checkpoints):** we store the full state of the model periodically, so we have access to partially trained models.
 * **[Transfer Learning](#Design-Pattern-13-Transfer-Learning):** we take part of a previously trained model, freeze the weights, and incorporate these nontrainalbe layers intoa new model that solvess the same problem, but on a smaller dataset.
-* **Distribution Strategy:** the training loop is carried out at scale over multiple workers.
+* **[Distribution Strategy](#Design-Pattern-14-Distribution-Strategy):** the training loop is carried out at scale over multiple workers.
 * **Hyperparameter Tuning:** the training loop itself is inserted into an optimization method to find the optimal set of model hyperparameters.
 
 ## Typical Training Loop
@@ -131,5 +131,134 @@ train_ds = train_ds.repeat()
 ---
 
 ## Design Pattern 13: Transfer Learning
+
+Training custom ML models on unstructured data requires extremely large datasets, which are not always readily available. Consider the case of
+
+* a model identifying whether an x-ray of an arm contains a broken bone.
+* a model that takes descriptions of patient symptoms and predicts the possible conditions associated with those symptoms.
+
+Because use cases like the image and text examples described above involve particularly specialized data domains, it's also not possible to use a general-purpose model to successfully identify bone fracture or diagnose diseases.
+
+To handle this, we need a solution that allows us to build a custom model using only the data we have available and with the labels we care about.
+
+**How to do that?** With _Transfer Learning_ design pattern, we can take a model that has been trained on the same type of data for a similar task and apply it to a specialized task using our own custom data.
+
+By "same type of data", we mean the same data modality - images, or texts.
+
+---
+
+**Bottleneck layer**
+
+<img src="img/bottleneck_layer.jpg" alt="bottleneck_layer" style="zoom:60%;" />
+
+When we load a pre-trained model, the last layer before the output layer is the **bottleneck layer**. It represents the input in the lowest-dimensionality space. In a way, we can consider this as **embeddings** that we use in our model.
+
+```python
+vgg_model = keras.applications.VGG19(
+  include_top=False,
+  weights="imagenet",
+  input_shape=((150, 150, 3))
+)
+vgg_model.trainable = False
+```
+
+By setting `include_top=False`, we're specifying that the last layer of VGG we want to load is the bottleneck layer. We've also set `vgg_model.trainable=False`, which means we don't want its parameters to be updated during our training.
+
+---
+
+**Implementing transfer learning**
+
+You can implement transfer learning in Keras using one of these two methods:
+
+1. Loading a pre-trained model on your own, removing the layers after the bottleneck, and adding a new final layer with your own data and labels. (Example: _classify colorectal histology images_)
+
+```python
+global_avg_layer = keras.layers.GlobalAveragePooling2D()
+feature_batch_avg = global_avg_layer(feature_batch)
+
+prediction_layer = keras.layers.Dense(8, activation='softmax')
+prediction_batch = prediction_layer(feature_batch_avg)
+
+histology_model = keras.Sequential([
+  vgg_model,
+  global_avg_layer,
+  prediction_layer
+])
+```
+
+
+
+2. Using a pre-trained TensorFlow Hub (https://tfhub.dev) module as the foundation for your transfer learning task. (Example: _movie review semantic analysis_)
+
+```python
+hub_layer = hub.KerasLayer(
+  "https://tfhub.dev/google/tf2-preview/gnews-swivel-20dim/1",
+  input_shape=[], dtype=tf.string, trainable=True)
+
+movie_review_model = keras.Sequential([
+  hub_layer,
+  keras.Layers.Dense(32, activation='relu'),
+  keras.Layers.Dense(1, activation='sigmoid')
+])
+```
+
+---
+
+**Tradeoffs and alternatives**
+
+* Fine-tuning vs feature extraction
+
+_Feature extraction_ describes an approach to transfer learning where you freeze the weights of all layers before the bottleneck layer and train the following layers on your own data and labels.
+
+_Fine-tuning_ is for updating the weights of the pre-trained model's layers. With fine-tuning, we may either update the weights of each layer in the pre-trained model, or just a few of the layers right before the bottleneck.
+
+When _fine-tuning_, it's common to leave the weights of the model's initial layers frozen since these layers have been trained to recognize basic features.
+
+```python
+base_model = keras.applications.MobileNetV2(input_shape=(160, 160, 3),
+                                            include_top=False,
+                                            weights='imagenet')
+for layer in base_model.layers[:100]:
+  layer.trainable = False  # Keep the first 100 layer unchanged.
+```
+
+One recommended approach to determining how many layers to freeze is known as _progressive fine-tuning_. It involves iteratively unfreezing layers after every training run to find the ideal number of layers to fine-tune. This works best and is most efficient if you keep your learning rate low (e.g., 0.001) and the number of training iterations relatively small.
+
+How should you determine whether to **fine-tune or feature extraction**?
+
+1. If you've got a small dataset, it's best to use the pre-trained model as a feature extractor rather than fine-tuning. Fine-tuning can cause the updated model to overfit to your small dataset.
+2. How similar your prediction task is to that of the original pre-trained model? If it is similar, fine-tuning can produce higher-accuracy results. When the task is different or the datasets are significantly different, it's best to freeze all the layers of the pre-trained model.
+
+Here's a summary:
+
+| Criterion                                                    | Feature extraction | Fine-tuning   |
+| ------------------------------------------------------------ | ------------------ | ------------- |
+| How large is the dataset?                                    | Small              | Large         |
+| Is your prediction task the same as that of the pre-trained model? | Different tasks    | Similar tasks |
+| Budget for training time and computional cost                | Low                | High          |
+
+
+
+* Focus on image and text models
+
+Transfer learning is primarily for cases where you can apply a similar task to the same data domain. Models trained with tabular data, however, cover a potentially infinite number of possible prediction tasks and data types. That is the reason _Transfer learning_ is typically focused on image or text models.
+
+(TabNet presents novel research in this area)
+
+
+
+* Embeddings of words versus sentences
+
+What we've seen so far has been _word embedding_. However, there could be a problem. See the following example:
+
+"_I've left you fresh baked cookies on the left side of the kitchen counter._"
+
+The word "_left_" appears twice and each has a different meaning. However, _word embeddings_ would be the same.
+
+_Sentence embeddings_ represent the entier sentences. It's training a supervised learning model to generate those embeddings. This is the approach used by Google's Universal Sentence Encoder and BERT. These methods differ from word embeddings in that they go beyond simply providing a weight lookup for individual words. Instead, they have been built by training a model on a large dataset of varied text to understand the meaning conveyed by _sequence of words_.
+
+---
+
+## Design Pattern 14: Distribution Strategy
 
 TBA
