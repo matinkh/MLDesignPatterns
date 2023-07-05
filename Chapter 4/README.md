@@ -6,7 +6,7 @@ ML models are usually trained iteratively, and this iterative process is informa
 * **[Checkpoints](#Design-Pattern-12-Checkpoints):** we store the full state of the model periodically, so we have access to partially trained models.
 * **[Transfer Learning](#Design-Pattern-13-Transfer-Learning):** we take part of a previously trained model, freeze the weights, and incorporate these nontrainalbe layers intoa new model that solvess the same problem, but on a smaller dataset.
 * **[Distribution Strategy](#Design-Pattern-14-Distribution-Strategy):** the training loop is carried out at scale over multiple workers.
-* **Hyperparameter Tuning:** the training loop itself is inserted into an optimization method to find the optimal set of model hyperparameters.
+* **[Hyperparameter Tuning](#Design-Pattern-15-Hyperparameter-Tuning):** the training loop itself is inserted into an optimization method to find the optimal set of model hyperparameters.
 
 ## Typical Training Loop
 
@@ -260,5 +260,85 @@ _Sentence embeddings_ represent the entier sentences. It's training a supervised
 ---
 
 ## Design Pattern 14: Distribution Strategy
+
+As the size of models and data incrases, the computation and memory demands increase proportionally, making the time it takes to train these models one of the biggest problems of deep learning. If it takes two weeks to train your neural network, then you have to wait two weeks before you can iterate on new ideas or experiment with teaking the settings. This is a problem.
+
+One way to accelarate training is through **distribution strategies** in the training loop. The common idea is to split the effort of training the model across different machines. There are two ways to do this:
+
+* **Data parallelism**: computation is split across different machines and **different workers train on different subsets of the training data**.
+* **Model parallelism**: the model is split and different workers carry out the computation for different parts of model. (<u>NOT the focus of this book</u>)
+
+---
+
+**Synchronous training**
+
+In synchronous training, the workers train on different slices of input data in parallel and **the gradient values are aggregated at the end of each training step**. This is performed via an _all-reduce_ algorithm.
+
+A central server holds the most current copy of the model parameters and performs the gradient step according to the gradients received from the multiple workers. Once the model parameters are updated according to this aggregated gradient step, the new model is sent back to the workers along with another split of the next mini-batch, and the process repeats.
+
+In TensorFlow, `tf.distribute.MirroredStrategy` supports synchronous distributed training across multiple GPUs on the same machine. Each model parameter is mirrored across all workers and stored as a single conceptual variable called `MirroredVariable`. During _all-reduce_ step, all gradient tensors are made available on each device.
+
+To implement this mirrored strategy in Keras, it's as simple as creating a `scope`. During training, each batch of the input data is divided equally among the multiple workers.
+
+```python
+mirrored_strategy = tf.distribute.MirroredStrategy()
+with mirrored_strategy.scope():
+  model = tf.keras.Sequential(...)
+  model.compile(loss='mse', optimizer='sgd', ...)
+  
+# The rest is as usual
+model.fit(training_ds, epochs=2)
+model.evalute(test_ds)
+```
+
+There are also other synchronous distribution strategies within Keras, such as
+
+* `MultipleWorkerMirroredStrategy`: for multiple machines
+* `CentralStorageStrategy`: model variables are not mirrored. They are placed in on the CPU and operations are replicated across all local GPUs.
+
+---
+
+**Asynchronous training**
+
+In asynchronous training, the workers train on different slices of the input data independently, and the model weights and parameters are updated asynchronously, typically through a parameter server architecture.
+
+The key difference between _synchronous_ and _asynchronous_ training is that the parameter server does not do an _all-reduce_. Instead, it computes the new model parameters periodically based on whichever gradient updates it received since the last computation.
+
+In this case, a slow worker doesn't block the progression of training. Or if a a single worker fails, the training continues as planned (some splits of mini-batches may be lost. This makes it difficult to know how many epochs of data have been processed. Another reason to specify virtual epochs)
+
+In Keras, `ParameterServerStrategy` implements asynchronous parameter server training on multiple machines. In your code, you would just replace `MirroredStrategy()` with `ParameterServerStrategy`.
+
+```python
+parameter_server_strategy = tf.distribute.ParameterServerStrategy()
+with parameter_server_strategy.scope():
+  model = tf.keras.Sequential(...)
+  model.compile(loss='mse', optimizer='sgd', ...)
+  
+model.fit(training_ds, epochs=2)
+model.evalute(test_ds)
+```
+
+---
+
+When to use _synchronous_ or _asynchronous_ training?
+
+* **Synchronous:** when all devices are on a single host and there are fast devices (e.g., TPUs or GPUs)
+* **Asynchronous:** if there are many low-power or unreliable workers.
+
+Overall, distributed training schemes drastically increase the throughput of data processed and can decrease training time from weeks to hours.
+
+---
+
+**Tradeoffs and alternatives**
+
+* **Choosing a batch size:** when multiple workers are at work, it's better to decrease the total number of training iteration - because the updated model should be shared among different workers and transfer time slows down the process. Therefore, **we should increase batch size. _HOWEVER_**, increasing the batch size alone ultimately causes the top-1 validation error to increase. They suggest the **learning rate should be linearly scaled as a function of the large batch size**.
+  * Setting the mini-batch size in the context of distributed training is a complex optimization space on its own.
+* **Minimizing I/O waits:** it's important to have efficient input pipelines to fully utilize the computing power available through distributed strategy. This can be achieved by
+  * using optimized file formats like TFRecords.
+  * building data pipelines using TensorFlow `tf.data` API.
+
+---
+
+## Design Pattern 15: Hyperparameter Tuning
 
 TBA
