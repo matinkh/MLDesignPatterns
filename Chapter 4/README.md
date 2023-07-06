@@ -4,7 +4,7 @@ ML models are usually trained iteratively, and this iterative process is informa
 
 * **[Useful Overfitting](#Design-Pattern-11-Useful-Overfitting):** we forgo the use of a validation or testing dataset, because we want to intentionally overfit on the training dataset.
 * **[Checkpoints](#Design-Pattern-12-Checkpoints):** we store the full state of the model periodically, so we have access to partially trained models.
-* **[Transfer Learning](#Design-Pattern-13-Transfer-Learning):** we take part of a previously trained model, freeze the weights, and incorporate these nontrainalbe layers intoa new model that solvess the same problem, but on a smaller dataset.
+* **[Transfer Learning](#Design-Pattern-13-Transfer-Learning):** we take part of a previously trained model, freeze the weights, and incorporate these nontrainalbe layers into a new model that solvess the same problem, but on a smaller dataset.
 * **[Distribution Strategy](#Design-Pattern-14-Distribution-Strategy):** the training loop is carried out at scale over multiple workers.
 * **[Hyperparameter Tuning](#Design-Pattern-15-Hyperparameter-Tuning):** the training loop itself is inserted into an optimization method to find the optimal set of model hyperparameters.
 
@@ -341,4 +341,99 @@ Overall, distributed training schemes drastically increase the throughput of dat
 
 ## Design Pattern 15: Hyperparameter Tuning
 
-TBA
+**Model parameters** refer to the weights and biases learned by your model. You do not have direct control over them, since they are largely a function of your training data and model architecture. Your model's weights are initialized with random values and then **optimized by your model through training iterations**.
+
+**Hyperparameters**, on the other hand, refer to any parameters that you, as a model builder, can control. They include values like **learning rate**, **number of epochs**, **number of layers**, etc.
+
+---
+
+**Manual tuning**
+
+Manually selecting the values for different hyperparameters might work for models that train in seconds or minutes, but it can quickly get expensive on larger models that require significant training time and infrastructure.
+
+---
+
+**Grid search and combinational explosion**
+
+A more structured version of the trail-and-error approach is known as _grid search_. We can run grid search by creating an instance of the `GridSearchCV` class and training the model passing it the values we defined earlier:
+
+```python
+my_regressor = RandomForestRegressor()
+
+grid_vals = {
+  'max_depth': [5, 10, 100],
+  'n_estimators': [100, 150, 200]
+}
+grid_search = GridSearchCV(
+  my_regressor, param_grid=grid_vals, scoring='max_error'
+)
+grid_search.fit(X, y)
+```
+
+To get the best combination of values from the grid search, we can run `grid_search.best_params_`.
+
+This grid search approach works OK on small examples. However, for larger examples, it will lead to **_combinational explosion_** - as we add additional hyperparameter and values to our grid of options, the number of possible combinations increases significantly.
+
+Another problem with grid search is that no logic is being applied when choosing different combination. **Grid search is essentially a brute force solution**.
+
+---
+
+Since both machine learning models themselves and the process of hyperparameter search are optimization problems, it would fullow that we would be able to use an approach that _learns_ to find the optimal hyperparameter combination within a given range of possible values just like our model learns from training data.
+
+We can think of **hyperparameter tuning as an outer optimization loop**.
+
+---
+
+**Bayesian optimization**
+
+Bayesian optimization is a technique for optimizing black-box functions. In our context, a machine learning model is our _black-box function_. The goal of Bayesian optimization is to directly train ou rmodel as few times as possible since doing so is costly.
+
+Instead of training our model each time we try a new combination of hyperparameters, Bayesian optimization defines a new function that emulates our model but is much cheaper to run. This is referred to as the **surrogate function**.
+
+This is significnaly cheaper than running our objective function each time we try different hyperparameters. Common approaches to generate the surrogate function include a _Gaussian process_ or a _tree-structured Parzen estimator_.
+
+---
+
+**Keras-tuner**
+
+The `kerastuner` library implements Bayesian optimization to do hyperparameter search directly in Keras. To use `kerastuner`, we define our model inside a function that takes a hyperparameter argument, here called `hp`. We specify the hyperparameter's name, data type, the value range, and the step.
+
+```python
+import kerastuner as kt
+
+def build_model(hp):
+  model = keras.Sequential([
+    keras.layers.Flatten(input_shape=(28, 28)),
+    keras.layers.Dense(hp.Int('first_hidden', 32, 256, step=32), activation='relu'),
+    keras.layers.Dense(hp.Int('second_hidden', 32, 256, step=32), activation='relu'),
+    keras.layers.Dense(10, activation='softmax')
+  ])
+	
+  model.compile(
+    optimizer=keras.optimizers.Adam(hp.Float('learning_rate', 0.005, 0.01, sampling='log')),
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+  )
+  
+  return model
+
+tuner = kt.BayesianOptimization(
+  build_model,
+  objective='val_accuracy',
+  max_trails=10
+)
+```
+
+The code to run the tuning job looks similar to training our model with `fit()`.
+
+---
+
+**Tradeoffs and alternatives**
+
+* The `kerastuner` approach may not scale to large machine learning problems because we'd like the trails to happen in parallel, and the likelihood of machine error and other failure increases.
+  * Hence, a fully managed, resilient approach that provides black-box optimization is useful for hyperparameter tuning.
+  * Google Cloud provides a service based on Vizier, which is an example of a managed service that implements Bayesian optimization.
+* **Genetic algorithms** are another less-common alternative. This approach works by first definig a _fitness function_. This function is typically the same as model's optimization metric.
+  * You randomly select a few combinations of hyperparameters from your search space and run a trial for each of them. You then take the hyperparameters that performed best - they become your new "population," and you use it to generate new combinations of values for the next set of trails.
+  * Because they use the results of previous trials to improve, genetic algorithms are "smarter" than manual, grid, and random search.
+  * However, when the hyperparameter search space is large, the complexity of genetic algorithm increases.
